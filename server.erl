@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author loris
+%%% @author Peguy
 %%% @doc
 %%%   To start a database in a new network:
 %%%     server:start()
@@ -11,7 +11,7 @@
 %%%-------------------------------------------------------------------
 
 -module(server).
--author("loris").
+-author("Peguy").
 -export([init/0 , join/1]).
 
 % Starts a new database network

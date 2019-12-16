@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author peguy
+%%% @author Peguy
 %%% @copyright (C) 2019, <COMPANY>
 %%% @doc
 %%%
@@ -8,7 +8,7 @@
 %%%-------------------------------------------------------------------
 
 -module(oxygen_db).
--author("peguy").
+-author("Peguy").
 
 %% API
 -compile(export_all).

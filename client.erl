@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author Black Star
+%%% @author Peguy
 %%% @copyright (C) 2019, <COMPANY>
 %%% @doc
 %%%
@@ -7,7 +7,7 @@
 %%% Created : 12. Dec 2019 11:51
 %%%-------------------------------------------------------------------
 -module(client).
--author("Black Star").
+-author("Peguy").
 
 %% API
 -export([connect/1]).
