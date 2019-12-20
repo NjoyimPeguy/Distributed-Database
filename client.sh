@@ -4,9 +4,14 @@ alias erl=erl.exe
 # shellcheck disable=SC2164
 cd "${0%/*}"
 erl -make
-if [ "$#" -lt 1 ]; then
-    echo "usage: client.sh <node>"
+if [ "$#" -eq 2 ]; then
+  if [ "$1" = "start_connection" ]; then
+  erl.exe -eval "client:start_connection('$2')" -sname client -noshell -setcookie 82736
+  else
+      echo "Usage: ./client.sh <connect> <node>"
+      exit 0
+  fi
+  else
+    echo "Wrong number of arguments!"
     exit 0
-    else
-      erl.exe -eval "client:start_connection('$1')" -sname client -noshell -setcookie 82736
 fi

@@ -14,34 +14,34 @@
 
 start_connection(ExistingNode) ->
   io:format("Welcome to the distributed databases client~n"),
-  ServerList = connect(ExistingNode),
+  ServerList = get_server_lists(ExistingNode),
   case length(ServerList) =/= 0 of
     true ->
       processing(ServerList);
     false -> ok
   end,
-  io:format("goodbye~n"),
+  io:format("Goodbye~n"),
   init:stop().
 
 
 processing(ServerList) ->
   % First taking the client's query,
   % then converting the client's query to lower cases.
-  CommandLine = string:to_lower(io:get_line("Query> ")),
+  CommandLine = io:get_line("Query> "),
   NextServerList = sendQuery(CommandLine, ServerList),
   case NextServerList =:= exit of
     true -> do_nothing;
     false -> processing(NextServerList)
   end.
 %%--------------------------------------------------------------------------
-%% connect(Node) -> [pid()]
+%% get_server_lists(Node) -> [pid()]
 %%         Node = atom()
 %%
 %% Description:
 %%   1. Connects the client to server by specifying its node name.
 %%   2. Returns the list of active servers in the network.
 %%--------------------------------------------------------------------------
-connect(ExistingNode) ->
+get_server_lists(ExistingNode) ->
   ServerPid = rpc:call(ExistingNode, erlang, whereis, [main_pid]),
   case is_pid(ServerPid) of
     true ->
@@ -78,7 +78,7 @@ sendQuery(CommandLine, [AliveServer | RemServers]) ->
       case length(Query) == 2 of
         true ->
           ExistingNode = lists:nth(2,  Query),
-          NextServerList = connect(binary_to_atom(ExistingNode, utf8)),
+          NextServerList = get_server_lists(binary_to_atom(ExistingNode, utf8)),
           if
             length(NextServerList) =:= 0 ->
               [AliveServer | RemServers];
@@ -98,7 +98,7 @@ sendQuery(CommandLine, [AliveServer | RemServers]) ->
             {readGranted, ServerPid, SearchedEntry, Data} ->
               case Data =/= none of
                 true ->
-                  io:format("CLIENT [~p] : is reading data entry {~s, ~s} received from SERVER [~p]~n", [self(), SearchedEntry, Data, ServerPid]),
+                  io:format("CLIENT [~p] : is reading data entry {~s, ~s} received from SERVER [~p]~n", [self(), SearchedEntry, Data, node(ServerPid)]),
                   [AliveServer | RemServers];
                 false ->
                   io:format("SERVER [~p] : sorry, I could not find your data!~n", [AliveServer]),
@@ -120,7 +120,7 @@ sendQuery(CommandLine, [AliveServer | RemServers]) ->
           AliveServer ! {write , self() , Value},
           receive
             {write_successful, Key} ->
-              io:format("CLIENT [~p] : has just received the Key '~s' from SERVER [~p] after writting the data '~s'~n", [self(), Key, AliveServer, Value]),
+              io:format("CLIENT [~p] : has just received the Key : ~s from SERVER [~p] after writting the data '~s'~n", [self(), Key, node(AliveServer), Value]),
               [AliveServer | RemServers];
             {'DOWN', _, process, _, _} ->
               NextServerList = onConnectionLost(RemServers),
@@ -132,7 +132,7 @@ sendQuery(CommandLine, [AliveServer | RemServers]) ->
       end;
 
     <<"quit">> ->
-      io:format("CLIENT [~p] stops requesting data to the SERVER [~p] for now",  [self(), AliveServer]),
+      io:format("CLIENT [~p] stops requesting data to the SERVER [~p] for now.~n",  [self(), AliveServer]),
       exit;
 
     <<"">> ->
@@ -158,7 +158,7 @@ onConnectionLost([]) ->
 
 onConnectionLost([Server | Rem]) ->
   io:format("connecting to antoher server~n"),
-  ServerList = connect(node(Server)),
+  ServerList = get_server_lists(node(Server)),
   case length(ServerList) =:= 0 of
     true ->
       onConnectionLost(node(Rem));

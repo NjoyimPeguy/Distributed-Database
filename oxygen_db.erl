@@ -15,10 +15,8 @@
 
 new() -> maps:new().
 
-% Read a given value associated with PrimaryKey if Map contains PrimaryKey.
-% If no value is associated with Key, 'none' is returned.
 read(Key, Db) -> maps:get(Key, Db, none).
 
-to_list(Db) -> maps:to_list(Db).
-
 write(Key, Value, Db) -> Db#{Key => Value}.
+
+to_list(Db) -> maps:to_list(Db).

@@ -51,74 +51,74 @@ join_servers([Pid | Tail]) ->
 
 % Main server loop
 main(Servers, Counter, Database) ->
-  io:format("active databases: ~p~n", [[self() | Servers]]),
   receive
-      {get_servers, NewServerPid} ->
-          io:format("Database [~p] has requested the list of the current active databases~n", [NewServerPid]),
-          NewServerPid ! [self() | Servers],
-          main(Servers, Counter, Database);
+    {get_servers, Pid} ->
+      io:format("[~s] has requested the list of the current active databases~n", [node(Pid)]),
+      Pid ! [self() | Servers],
+      main(Servers, Counter, Database);
 
-      {join, NewServerPid} ->
-          io:format("A new database (~p) has joined the network~n", [node(NewServerPid)]),
-          erlang:monitor(process, NewServerPid),
-          main(Servers ++ [NewServerPid], Counter, Database);% updating the list of current active databases.
+    {join, NewServerPid} ->
+      io:format("A new database (~p) has joined the network~n", [node(NewServerPid)]),
+      erlang:monitor(process, NewServerPid),
+      main(Servers ++ [NewServerPid], Counter, Database);% updating the list of current active databases.
 
-      {'DOWN', _, process, NewServerPid, Reason} ->
-          io:format("An active database (~p) has left the network (~p)~n", [NewServerPid, Reason]),
-          main(lists:delete(NewServerPid, Servers), Counter, Database);
+    {'DOWN', _, process, NewServerPid, Reason} ->
+      io:format("An active database (~s) has left the network (~s)~n", [node(NewServerPid), Reason]),
+      main(lists:delete(NewServerPid, Servers), Counter, Database);
 
-      {ask, ServerPidRequesting, Key} ->
-          LocalData = oxygen_db:read(Key, Database),
-          ServerPidRequesting ! {self(), LocalData},
-          main(Servers, Counter, Database);
+    {ask, ServerPidRequesting, Key} ->
+      LocalData = oxygen_db:read(Key, Database),
+      ServerPidRequesting ! {self(), LocalData},
+      main(Servers, Counter, Database);
 
-      {write, ClientPidRequesting, Value} ->
-          io:format("SERVER [~p] : received request from client [~p] to write data :~s~n", [self(), node(ClientPidRequesting), Value]),
-          KeyStr = io_lib:format("~s:~p", [node(), Counter]),
-          KeyList = re:replace(base64:encode(crypto:hash(md5, KeyStr)), "=", "", [global]),
-          Key = list_to_binary(KeyList),
-          NewDatabase = oxygen_db:write(Key, Value, Database),
-          io:format("Adding in the database {Key = ~s, Value = ~s}~n", [Key, Value]),
-          ClientPidRequesting ! {write_successful, Key},
-          NewCounter = Counter + 1,
-          main(Servers, NewCounter, NewDatabase);
+    {write, ClientPidRequesting, Value} ->
+      io:format("SERVER [~p] : received request from client [~p] to write data '~s'.~n", [self(), node(ClientPidRequesting), Value]),
+      KeyStr = io_lib:format("~s:~p", [node(self()), Counter]),
+      CipherKey = re:replace(base64:encode(crypto:hash(md5, KeyStr)), "=", "",  [global, {return, list}]),
+      Key = list_to_binary(CipherKey),
+      NewDatabase = oxygen_db:write(Key, Value, Database),
+      io:format("SERVER [~p] : adds in the database : {Key = ~s, Value = ~s}~n", [self(), Key, Value]),
+      ClientPidRequesting ! {write_successful, Key},
+      NewCounter = Counter + 1,
+      main(Servers, NewCounter, NewDatabase);
 
-      {read, ClientPidRequesting, SearchedEntry} ->
-          io:format("SERVER [~p] : received request from client [~p] to read data~n", [self(), node(ClientPidRequesting)]),
-          % This server starts searching the entry within its own database
-          LocalData = oxygen_db:read(SearchedEntry, Database),
-          case LocalData =/= none of
-              true ->
-                  % If the entry was found, then just return to the client.
-                  ClientPidRequesting ! {readGranted, self(), SearchedEntry, LocalData};
-              false ->
-                  io:format("SERVER [~p] : is aking to other databases...~n", [self()]),
-                  % Otherwise ask every other client if they have the wanted entry
-                  {RemoteServer, RemoteData} = getRemoteData(SearchedEntry, Servers),
-                  case RemoteData =/= none of
-                      true ->
-                          io:format("SERVER [~p] : is updating its database...~n", [self()]),
-                          NewDatabase = oxygen_db:write(SearchedEntry, RemoteData, Database),
-                          main(Servers, Counter, NewDatabase);
-                      false ->
-                          ClientPidRequesting ! {readGranted, RemoteServer, SearchedEntry, none}
-                  end
-          end,
-          main(Servers, Counter, Database)
+    {read, ClientPidRequesting, SearchedEntry} ->
+      io:format("SERVER [~p] : received request from client [~p] to read data~n", [self(), node(ClientPidRequesting)]),
+      % This server starts searching the entry within its own database
+      LocalData = oxygen_db:read(SearchedEntry, Database),
+      case LocalData =/= none of
+        true ->
+          % If the entry was found, then just return to the client.
+          ClientPidRequesting ! {readGranted, self(), SearchedEntry, LocalData};
+        false ->
+          io:format("SERVER [~p] : asks to other databases...~n", [self()]),
+          % Otherwise ask every other client if they have the wanted entry
+          {RemoteServer, RemoteData} = getRemoteData(SearchedEntry, Servers),
+          case RemoteData =/= none of
+            true ->
+              io:format("SERVER [~p] : is updating its database...~n", [self()]),
+              NewDatabase = oxygen_db:write(SearchedEntry, RemoteData, Database),
+              ClientPidRequesting ! {readGranted, RemoteServer, SearchedEntry, RemoteData},
+              main(Servers, Counter, NewDatabase);
+            false ->
+              ClientPidRequesting ! {readGranted, self(), SearchedEntry, none}
+          end
+      end,
+      main(Servers, Counter, Database)
   end.
 
-getRemoteData(_, []) -> none;
+getRemoteData(_, []) -> {self(), none};
 getRemoteData(SearchedEntry, [OtherServer | Tail]) ->
 % Upon receiving a request from a given client,
 % This server/node has to send a message to every other node,
 % to get the searched data.
   OtherServer ! {ask, self(), SearchedEntry},
   receive
-      {RemoteServer, ReturnedEntry} ->
-          case undefined =:= ReturnedEntry of
-              true ->
-                  getRemoteData(SearchedEntry, Tail);
-              false ->
-                  {RemoteServer, ReturnedEntry}
-          end
+    {RemoteServer, ReturnedEntry} ->
+      case none =:= ReturnedEntry of
+        true ->
+          getRemoteData(SearchedEntry, Tail);
+        false ->
+          {RemoteServer, ReturnedEntry}
+      end
   end.
