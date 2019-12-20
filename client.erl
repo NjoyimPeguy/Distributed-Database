@@ -10,12 +10,12 @@
 -author("Peguy").
 
 %% API
--export([start/1]).
+-export([start_connection/1]).
 
-start(ExistingNode) ->
+start_connection(ExistingNode) ->
   io:format("Welcome to the distributed databases client~n"),
   ServerList = connect(ExistingNode),
-  case length(ServerList) == 0 of
+  case length(ServerList) =/= 0 of
     true ->
       processing(ServerList);
     false -> ok
@@ -68,6 +68,7 @@ connect(ExistingNode) ->
 %%   Returns the next database to use, or 'exit'
 %%   if the user has requested the program to close.
 %%--------------------------------------------------------------------------
+sendQuery(_, []) -> exit;
 sendQuery(CommandLine, [AliveServer | RemServers]) ->
   % Splitting the client's query.
   Query = re:split(string:trim(CommandLine), "\s+"),
@@ -91,7 +92,7 @@ sendQuery(CommandLine, [AliveServer | RemServers]) ->
     <<"read">> ->
       case length(Query) == 2  of
         true ->
-          Entry = binary_to_list(lists:nth(2, Query)),
+          Entry = lists:nth(2, Query),
           AliveServer ! {read, self(), Entry},
           receive
             {readGranted, ServerPid, SearchedEntry, Data} ->
@@ -112,9 +113,10 @@ sendQuery(CommandLine, [AliveServer | RemServers]) ->
       end;
 
     <<"write">> ->
-      case length(Query) == 2  of
+      case length(Query) >= 2  of
         true ->
-          Value = binary_to_list(lists:nth(2, Query)),
+          [_ | ValueTokens] = [binary_to_list(Token) || Token <- Query],
+          Value = string:join(ValueTokens, " "),
           AliveServer ! {write , self() , Value},
           receive
             {write_successful, Key} ->

@@ -12,10 +12,10 @@
 
 -module(server).
 -author("Peguy").
--export([init/0, join/1]).
+-export([start/0, join/1]).
 
 % Starts a new database network
-init() ->
+start() ->
   register(main_pid, self()),
   io:format("Starting the first new database network at node ~p~n", [node()]),
   Database = oxygen_db:new(),
@@ -26,13 +26,19 @@ init() ->
 join(ExistingNode) ->
   register(main_pid, self()),
   Pid = rpc:call(ExistingNode, erlang, whereis, [main_pid]),
-  Pid ! {get_servers, self()},
-  receive
-      Servers ->
+  case is_pid(Pid) of
+    true ->
+      Pid ! {get_servers, self()},
+      receive
+        Servers ->
           io:format("A new database wants to joined the database network ~p~n", [[node(Server) || Server <- [self() | Servers]]]),
           join_servers(Servers),
           Database = oxygen_db:new(),
           main(Servers, 0, Database)
+      end;
+    false ->
+      io:format("cannot connect to node ~s~n", [ExistingNode]),
+      init:stop()
   end.
 
 join_servers([]) -> done;
@@ -49,7 +55,7 @@ main(Servers, Counter, Database) ->
   receive
       {get_servers, NewServerPid} ->
           io:format("Database [~p] has requested the list of the current active databases~n", [NewServerPid]),
-          NewServerPid ! Servers ++ [self()],
+          NewServerPid ! [self() | Servers],
           main(Servers, Counter, Database);
 
       {join, NewServerPid} ->
@@ -68,7 +74,9 @@ main(Servers, Counter, Database) ->
 
       {write, ClientPidRequesting, Value} ->
           io:format("SERVER [~p] : received request from client [~p] to write data :~s~n", [self(), node(ClientPidRequesting), Value]),
-          Key = lists:flatten(io_lib:format("~s:~w", [pid_to_list(ClientPidRequesting), Counter])),
+          KeyStr = io_lib:format("~s:~p", [node(), Counter]),
+          KeyList = re:replace(base64:encode(crypto:hash(md5, KeyStr)), "=", "", [global]),
+          Key = list_to_binary(KeyList),
           NewDatabase = oxygen_db:write(Key, Value, Database),
           io:format("Adding in the database {Key = ~s, Value = ~s}~n", [Key, Value]),
           ClientPidRequesting ! {write_successful, Key},
