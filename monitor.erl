@@ -13,9 +13,48 @@
 -export([]).
 
 commands(CommandLine, ExistingNode) ->
-  Tokens = re:split(string:trim(CommandLine), "\s+").
-%%  case lists:nth(1, Tokens) of
-%%  end
+  Tokens = re:split(string:trim(CommandLine), "\s+"),
+  case lists:nth(1, Tokens) of
+    <<"status">> ->
+      print_status(ExistingNode),
+      ExistingNode;
+
+    <<"connect">> ->
+      case length(Tokens) == 2 of
+        true ->
+          DestNode = lists:nth(2, Tokens),
+          connect(binary_to_atom(DestNode, utf8));
+        false ->
+          io:format("Usage: connect <node>~n"),
+          ExistingNode
+      end;
+
+    <<"add">> ->
+      case ExistingNode =:= null of
+        true ->
+          io:format("The monitor [~p] is connected to a new netowrk with ", [self()]),
+          ExistingNode
+      end;
+
+    <<"stop">> ->
+      case length(Tokens) == 2 of
+        true ->
+          DestNode = lists:nth(2, Tokens),
+          stop(binary_to_atom(DestNode, utf8)),
+          ExistingNode;
+        false ->
+          io:format("Usage: stop <node>~n"),
+          ExistingNode
+      end;
+
+    <<"quit">> ->  exit;
+
+    <<"">> -> ExistingNode;
+
+    _ ->
+      io:format("unkown command: ~s~n", [lists:nth(1, Tokens)]),
+      ExistingNode
+  end.
 
 %%--------------------------------------------------------------------------
 %% connect(FromExistingNode) -> Node | null
@@ -29,7 +68,7 @@ connect(FromExistingNode) ->
   ServerPid = rpc:call(FromExistingNode, erlang, whereis, [main_pid]),
   case is_pid(ServerPid) of
     true ->
-      io:format("Monitor [~p] is connected to a new netowrk with ", [self()]),
+      io:format("The monitor [~p] is connected to a new netowrk with ", [self()]),
       print_status(FromExistingNode);
     false ->
       io:format("Monitor [~p] cannot connected to a server", [self()])
@@ -45,8 +84,8 @@ connect(FromExistingNode) ->
 %%   Returns 'ok' if stopped successfully, or 'error' if it failed.
 %%--------------------------------------------------------------------------
 stop(ExistingNode) ->
-  Result = rpc:call(ExistingNode, init, stop, []),
-  case Result =:= ok of
+  ServerPid = rpc:call(ExistingNode, init, stop, []),
+  case ServerPid =:= ok of
     true ->
       io:format("Server [~p] is being stopped", [node(ExistingNode)]),
       ok;
