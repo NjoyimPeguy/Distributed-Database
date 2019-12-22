@@ -72,18 +72,18 @@ main(Servers, Counter, Database) ->
       main(Servers, Counter, Database);
 
     {write, ClientPidRequesting, Value} ->
-      io:format("SERVER [~p] : received request from client [~p] to write data '~s'.~n", [self(), node(ClientPidRequesting), Value]),
+      io:format("SERVER [~p] : received request from client [~p] to write data '~s'.~n", [node(self()), node(ClientPidRequesting), Value]),
       KeyStr = io_lib:format("~s:~p", [node(self()), Counter]),
       CipherKey = re:replace(base64:encode(crypto:hash(md5, KeyStr)), "=", "",  [global, {return, list}]),
       Key = list_to_binary(CipherKey),
       NewDatabase = oxygen_db:write(Key, Value, Database),
-      io:format("SERVER [~p] : adds in the database : {Key = ~s, Value = ~s}~n", [self(), Key, Value]),
+      io:format("SERVER [~p] : adds in the database : {Key = ~s, Value = ~s}~n", [node(self()), Key, Value]),
       ClientPidRequesting ! {write_successful, Key},
       NewCounter = Counter + 1,
       main(Servers, NewCounter, NewDatabase);
 
     {read, ClientPidRequesting, SearchedEntry} ->
-      io:format("SERVER [~p] : received request from client [~p] to read data~n", [self(), node(ClientPidRequesting)]),
+      io:format("SERVER [~p] : received a request from client [~p] to read data~n", [node(self()), node(ClientPidRequesting)]),
       % This server starts searching the entry within its own database
       LocalData = oxygen_db:read(SearchedEntry, Database),
       case LocalData =/= none of
@@ -91,12 +91,12 @@ main(Servers, Counter, Database) ->
           % If the entry was found, then just return to the client.
           ClientPidRequesting ! {readGranted, self(), SearchedEntry, LocalData};
         false ->
-          io:format("SERVER [~p] : asks to other databases...~n", [self()]),
+          io:format("SERVER [~p] : asks to other databases...~n", [node(self())]),
           % Otherwise ask every other client if they have the wanted entry
           {RemoteServer, RemoteData} = getRemoteData(SearchedEntry, Servers),
           case RemoteData =/= none of
             true ->
-              io:format("SERVER [~p] : is updating its database...~n", [self()]),
+              io:format("SERVER [~p] : is updating its database...~n", [node(self())]),
               NewDatabase = oxygen_db:write(SearchedEntry, RemoteData, Database),
               ClientPidRequesting ! {readGranted, RemoteServer, SearchedEntry, RemoteData},
               main(Servers, Counter, NewDatabase);

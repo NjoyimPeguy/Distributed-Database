@@ -20,7 +20,7 @@ start_connection(ExistingNode) ->
       processing(ServerList);
     false -> ok
   end,
-  io:format("Goodbye~n"),
+  io:format("and leaves the network...~n"),
   init:stop().
 
 
@@ -98,10 +98,10 @@ sendQuery(CommandLine, [AliveServer | RemServers]) ->
             {readGranted, ServerPid, SearchedEntry, Data} ->
               case Data =/= none of
                 true ->
-                  io:format("CLIENT [~p] : is reading data entry {~s, ~s} received from SERVER [~p]~n", [self(), SearchedEntry, Data, node(ServerPid)]),
+                  io:format("CLIENT [~p] : is reading data entry {~s, ~s} received from SERVER [~p]~n", [node(self()), SearchedEntry, Data, node(ServerPid)]),
                   [AliveServer | RemServers];
                 false ->
-                  io:format("SERVER [~p] : sorry, I could not find your data!~n", [AliveServer]),
+                  io:format("SERVER [~p] : sorry, I could not find your data!~n", [node(AliveServer)]),
                   [AliveServer | RemServers]
               end;
             {'DOWN', _, process, _, _} ->
@@ -120,7 +120,7 @@ sendQuery(CommandLine, [AliveServer | RemServers]) ->
           AliveServer ! {write , self() , Value},
           receive
             {write_successful, Key} ->
-              io:format("CLIENT [~p] : has just received the Key : ~s from SERVER [~p] after writting the data '~s'~n", [self(), Key, node(AliveServer), Value]),
+              io:format("CLIENT [~p] : has just received the Key : ~s from SERVER [~p] after writting the data '~s'~n", [node(self()), Key, node(AliveServer), Value]),
               [AliveServer | RemServers];
             {'DOWN', _, process, _, _} ->
               NextServerList = onConnectionLost(RemServers),
@@ -132,7 +132,7 @@ sendQuery(CommandLine, [AliveServer | RemServers]) ->
       end;
 
     <<"quit">> ->
-      io:format("CLIENT [~p] stops requesting data to the SERVER [~p] for now.~n",  [self(), AliveServer]),
+      io:format("CLIENT [~p] stops requesting data to the SERVER [~p] ",  [node(self()), node(AliveServer)]),
       exit;
 
     <<"">> ->
