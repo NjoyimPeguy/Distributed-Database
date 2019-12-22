@@ -6,7 +6,7 @@ cd "${0%/*}"
 erl -make
 if [ "$#" -eq 2 ]; then
   if [ "$1" = "start_connection" ]; then
-  erl.exe -eval "client:start_connection('$2')" -sname client -noshell -setcookie 82736
+  erl -eval "client:start_connection('$2')" -sname client -noshell -setcookie 82736
   else
       echo "Usage: ./client.sh <connect> <node>"
       exit 0
