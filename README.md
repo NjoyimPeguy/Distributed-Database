@@ -10,7 +10,7 @@ Running bash script
 Server example : "./server.sh \<function\> \<node-name\>"  
 Client example : "./client.sh \<function\> \<server-name\>"  
   
-Starting the first node/server : `./server.sh start <node>`  
+Starting a new network : `./server.sh`
   
 Joining a server : `./server.sh join <existing-node>`
 
