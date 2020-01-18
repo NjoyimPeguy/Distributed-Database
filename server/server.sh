@@ -1,15 +1,15 @@
 #!/bin/sh
-# shellcheck disable=SC2164
-cd "${0%/*}"
+cd "${0%/*}" || exit
 erl -make
-Number=0
+. ./server_ids.txt
+nextCounter=$SERVER_ID
 
 if [ "$#" -eq 0 ]; then
     erl -s server -sname main -noshell -setcookie 82736
 elif [ "$#" -eq 2 ]; then
   if [ "$1" = "join" ]; then
-    # shellcheck disable=SC2039
-    erl -eval "server:join('$2')" -sname server"$((++Number))" -noshell -setcookie 82736
+    erl -eval "server:join('$2')" -sname server"$nextCounter" -noshell -setcookie 82736
+    sed -i "s/SERVER_ID=.*/SERVER_ID=$((nextCounter + 1))/" ./server_ids.txt
   else
     echo "Function $1 does not exist!"
     exit 0
