@@ -28,12 +28,18 @@ processing(FromExistingNode) ->
       processing(NextExistingNode)
   end.
 
-commands(CommandLine, ExistingNode) ->
+commands(CommandLine, FromExistingNode) ->
   Tokens = re:split(string:trim(CommandLine), "\s+"),
   case lists:nth(1, Tokens) of
     <<"status">> ->
-      print_status(ExistingNode),
-      ExistingNode;
+      if
+        FromExistingNode =:= null->
+          io:format("There are no servers to print!~n"),
+          FromExistingNode;
+        true ->
+          print_status(FromExistingNode),
+          FromExistingNode
+        end;
 
     <<"connect">> ->
       case length(Tokens) == 2 of
@@ -41,23 +47,8 @@ commands(CommandLine, ExistingNode) ->
           DestNode = lists:nth(2, Tokens),
           connect(binary_to_atom(DestNode, utf8));
         false ->
-          io:format("Usage: connect <node>~n"),
-          ExistingNode
-      end;
-
-    <<"add">> ->
-      if
-        ExistingNode =:= null ->
-          io:format("The monitor [~p] is connected to a new netowrk with ", [self()]),
-          ExistingNode;
-
-        length(Tokens) == 2 ->
-          HostName = lists:nth(2, Tokens),
-          deploy(HostName, ExistingNode);
-
-        true ->
-          io:format("usage: add <host_name>~n"),
-          ExistingNode
+          io:format("Usage: connect 'nodeName' (without single quotes)~n"),
+          FromExistingNode
       end;
 
     <<"stop">> ->
@@ -65,51 +56,22 @@ commands(CommandLine, ExistingNode) ->
         true ->
           DestNode = lists:nth(2, Tokens),
           stop(binary_to_atom(DestNode, utf8)),
-          ExistingNode;
+          FromExistingNode;
         false ->
           io:format("Usage: stop <node>~n"),
-          ExistingNode
+          FromExistingNode
       end;
 
-    <<"quit">> ->  exit;
+    <<"quit">> -> exit;
 
-    <<"">> -> ExistingNode;
+    <<"exit">> -> exit;
+
+    <<"">> -> FromExistingNode;
 
     _ ->
       io:format("unkown command: ~s~n", [lists:nth(1, Tokens)]),
-      ExistingNode
+      FromExistingNode
   end.
-
-%%--------------------------------------------------------------------------
-%% deploy(Host, ActiveNode) -> NextNode
-%%        Host = string()
-%%        Node = atom() | null
-%%        NextNode = atom()
-%%
-%% Description:
-%%   If 'ActiveNode' is 'null', then the monitor
-%%   starts a server in a new databases network.
-%%   Otherwise, it starts a server that joins
-%%   an existing network by specifying one of the active nodes.
-%%   Returns the newly created server.
-%%--------------------------------------------------------------------------
-
-deploy(HostName, ActiveNode) ->
-  % create a random ID
-  NodeName = io_lib:format("mnt~p", [rand:uniform(1000)]),
-
-  case ActiveNode =/= null of
-    true ->
-      CommandLine = io_lib:format("./deploy.sh ~s ~s ~s", [NodeName, HostName, ActiveNode]);
-    false ->
-      CommandLine = io_lib:format("./deploy.sh ~s ~s", [NodeName, HostName])
-  end,
-
-  % executing the script
-  io:format("~s", [os:cmd(CommandLine)]),
-
-  % return the new node
-  list_to_atom(lists:flatten(io_lib:format("~s@~s", [NodeName, HostName]))).
 
 %%--------------------------------------------------------------------------
 %% connect(FromExistingNode) -> Node | null
@@ -126,7 +88,7 @@ connect(FromExistingNode) ->
       io:format("The monitor [~p] is connected to a new netowrk with ", [self()]),
       print_status(FromExistingNode);
     false ->
-      io:format("Monitor [~p] cannot connected to a server", [self()])
+      io:format("Monitor [~p] cannot connected to a server~n", [self()])
   end.
 
 

@@ -1,23 +1,17 @@
 #!/bin/sh
-alias erl=erl.exe
-if [ "$#" -lt 2 ]; then
-    echo "usage: deploy.sh <host> <id> [existing-node]"
-    exit 0
-fi
-
-# shellcheck disable=SC2164
-cd "${0%/*}"
+cd "${0%/*}" || exit
+erl -make
+. ../config.txt
 
 NAME=$1
-HOST=$2
-ACTIVE_NODE=$3
+ACTIVE_NODE=$2
 
-echo "deploying new node $NAME@$HOST..."
-erl -make
-if [ "$#" -eq 2 ]; then
-  erl -sname $NAME -noshell -setcookie 82736 -detached -s server
-elif [ "$#" -eq 3 ]; then
-  erl -sname $NAME -noshell -setcookie 82736 -detached -eval "server:join('$ACTIVE_NODE')."
+if [ "$#" -eq 1 ]; then
+  xterm -hold -e erl -sname "$NAME" -noshell -setcookie "$COOKIE" -s server
+elif [ "$#" -eq 2 ]; then
+  xterm -e erl -sname "$NAME" -noshell -setcookie "$COOKIE" -detached -eval "server:join('$ACTIVE_NODE')."
 else
-  echo "Invalid Argument!"
+  echo "usage: deploy.sh name"
+  echo "usage: deploy.sh name existingnode"
+  exit 0
 fi

@@ -52,9 +52,9 @@ join_servers([Pid | Tail]) ->
 % Main server loop
 main(Servers, Counter, Database) ->
   receive
-    {get_servers, Pid} ->
-      io:format("[~s] has requested the list of the current active databases~n", [node(Pid)]),
-      Pid ! [self() | Servers],
+    {get_servers, ServerPidRequesting} ->
+      io:format("[~s] has requested the list of the current active databases~n", [node(ServerPidRequesting)]),
+      ServerPidRequesting ! [self() | Servers],
       main(Servers, Counter, Database);
 
     {join, NewServerPid} ->
