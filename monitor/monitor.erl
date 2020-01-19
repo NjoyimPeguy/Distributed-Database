@@ -23,7 +23,7 @@ processing(FromExistingNode) ->
   NextExistingNode = commands(CommandLine, FromExistingNode),
   case NextExistingNode =:= null of
     true ->
-      processing(FromExistingNode);
+      processing(null);
     false ->
       processing(NextExistingNode)
   end.
@@ -41,8 +41,35 @@ commands(CommandLine, FromExistingNode) ->
           FromExistingNode
         end;
 
+    % Create a new database network
+    <<"create">> ->
+      case length(Tokens) =:= 2 of
+        true ->
+          NodeName = lists:nth(2, Tokens),
+          deploy(NodeName, null),
+          FromExistingNode;
+        false ->
+          io:format("Usage: create 'nodeName' (without single quotes)~n"),
+          FromExistingNode
+      end;
+
+    <<"join">> ->
+      if
+        FromExistingNode =:= null ->
+          io:format("You need to connect to a network!~n"),
+          FromExistingNode;
+
+        length(Tokens) =:= 2 ->
+          NodeName = lists:nth(2, Tokens),
+          deploy(NodeName, FromExistingNode),
+          FromExistingNode;
+
+        true ->
+          io:format("usage: join 'nodeName' (without single quotes)~n")
+      end;
+
     <<"connect">> ->
-      case length(Tokens) == 2 of
+      case length(Tokens) =:= 2 of
         true ->
           DestNode = lists:nth(2, Tokens),
           connect(binary_to_atom(DestNode, utf8));
@@ -58,7 +85,7 @@ commands(CommandLine, FromExistingNode) ->
           stop(binary_to_atom(DestNode, utf8)),
           FromExistingNode;
         false ->
-          io:format("Usage: stop <node>~n"),
+          io:format("usage: stop nodeName' (without single quotes)~n"),
           FromExistingNode
       end;
 
@@ -74,6 +101,31 @@ commands(CommandLine, FromExistingNode) ->
   end.
 
 %%--------------------------------------------------------------------------
+%% deploy(Host, Node) -> NextNode
+%%        Host = string()
+%%        Node = atom() | null
+%%        NextNode = atom()
+%%
+%% Description:
+%%   If node is 'null', starts a server in a new databases network.
+%%   Otherwise, starts a server that joins an existing network by
+%%   specifying one of the active nodes.
+%%   Returns the node of the newly created server.
+%%--------------------------------------------------------------------------
+
+deploy(NodeName, ExistingNode) ->
+
+  if
+    ExistingNode =/= null ->
+      CommandLine = io_lib:format("./deploy.sh ~s ~s", [NodeName, ExistingNode]);
+    true ->
+      CommandLine = io_lib:format("./deploy.sh ~s", [NodeName])
+  end,
+
+  % execute the script
+  io:format("~s", [os:cmd(CommandLine)]).
+
+%%--------------------------------------------------------------------------
 %% connect(FromExistingNode) -> Node | null
 %%         FromExistingNode = atom()
 %%
@@ -86,7 +138,8 @@ connect(FromExistingNode) ->
   case is_pid(ServerPid) of
     true ->
       io:format("The monitor [~p] is connected to a new netowrk with ", [self()]),
-      print_status(FromExistingNode);
+      print_status(FromExistingNode),
+      FromExistingNode;
     false ->
       io:format("Monitor [~p] cannot connected to a server~n", [self()])
   end.
@@ -104,11 +157,9 @@ stop(ExistingNode) ->
   ServerPid = rpc:call(ExistingNode, init, stop, []),
   case ServerPid =:= ok of
     true ->
-      io:format("Server [~p] is being stopped", [node(ExistingNode)]),
-      ok;
+      io:format("Server [~s] is being stopped~n", [ExistingNode]);
     false ->
-      io:format("Server [~p] cannot be stopped", [node(ExistingNode)]),
-      error
+      io:format("Server [~s] cannot be stopped~n", [ExistingNode])
   end.
 
 %%--------------------------------------------------------------------------
@@ -148,7 +199,7 @@ print_status(FromExistingNode) ->
       none
   end.
 
-print([]) -> do_nothing;
+print([]) -> ok;
 print([ServerPid | OtherServerPid]) ->
   io:format("- ~s~n", [node(ServerPid)]),
   print(OtherServerPid).

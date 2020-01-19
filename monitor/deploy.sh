@@ -7,9 +7,9 @@ NAME=$1
 ACTIVE_NODE=$2
 
 if [ "$#" -eq 1 ]; then
-  xterm -hold -e erl -sname "$NAME" -noshell -setcookie "$COOKIE" -s server
+  erl -sname "$NAME" -pa ../server -noshell -setcookie "$COOKIE" -detached -s server
 elif [ "$#" -eq 2 ]; then
-  xterm -e erl -sname "$NAME" -noshell -setcookie "$COOKIE" -detached -eval "server:join('$ACTIVE_NODE')."
+  erl -sname "$NAME" -pa ../server -noshell -setcookie "$COOKIE" -detached -eval "server:join('$ACTIVE_NODE')."
 else
   echo "usage: deploy.sh name"
   echo "usage: deploy.sh name existingnode"
